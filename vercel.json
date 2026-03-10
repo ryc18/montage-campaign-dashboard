@@ -1,0 +1,11 @@
+{
+    "version": 2,
+    "buildCommand": "npx vite build --config vite.config.js",
+    "outputDirectory": "dist",
+    "rewrites": [
+        {
+            "source": "/api/(.*)",
+            "destination": "/api"
+        }
+    ]
+}
