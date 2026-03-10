@@ -4,13 +4,43 @@ const fs = require('fs');
 const path = require('path');
 
 // ─────────────────────────────────────────────────────────────
-// Demo campaign data based on Cory's screenshots
-// This serves as fallback when Pipedrive Campaigns API is unavailable
-// Replace with live API calls when/if Pipedrive exposes campaign endpoints
+// Live data loader — reads from Vercel Blob if available
+// Falls back to hardcoded demo data below
+// ─────────────────────────────────────────────────────────────
+let cachedLiveData = null;
+let lastFetchTime = 0;
+const CACHE_TTL = 30000; // 30 seconds
+
+async function getLiveData() {
+    // Only attempt blob fetch in production (when BLOB_READ_WRITE_TOKEN exists)
+    if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
+
+    const now = Date.now();
+    if (cachedLiveData && (now - lastFetchTime) < CACHE_TTL) {
+        return cachedLiveData;
+    }
+
+    try {
+        const { list } = require('@vercel/blob');
+        const { blobs } = await list({ prefix: 'campaign-data.json' });
+        if (blobs.length === 0) return null;
+
+        const response = await fetch(blobs[0].url);
+        cachedLiveData = await response.json();
+        lastFetchTime = now;
+        return cachedLiveData;
+    } catch (err) {
+        console.error('Failed to load live data from blob:', err.message);
+        return null;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Fallback demo data (used when no live data exists in blob)
 // ─────────────────────────────────────────────────────────────
 
-// Client definitions
-const clients = [
+// Client definitions (fallback)
+const defaultClients = [
     { id: 'montage', name: 'Montage', color: '#6C63FF' },
     { id: 'institugen', name: 'Institugen', color: '#00C9A7' },
 ];
@@ -397,13 +427,18 @@ const campaignData = {
 };
 
 // GET /api/clients — list available clients
-router.get('/clients', (req, res) => {
-    res.json({ success: true, data: clients });
+router.get('/clients', async (req, res) => {
+    const liveData = await getLiveData();
+    const clientList = liveData ? liveData.clients : defaultClients;
+    res.json({ success: true, data: clientList });
 });
 
 // GET /api/campaigns — list all campaigns (optionally filtered by ?client=)
-router.get('/campaigns', (req, res) => {
-    let filtered = campaignData.campaigns;
+router.get('/campaigns', async (req, res) => {
+    const liveData = await getLiveData();
+    const allCampaigns = liveData ? liveData.campaigns : campaignData.campaigns;
+
+    let filtered = allCampaigns;
     if (req.query.client) {
         filtered = filtered.filter((c) => c.client === req.query.client);
     }
@@ -419,8 +454,10 @@ router.get('/campaigns', (req, res) => {
 });
 
 // GET /api/campaigns/:id — full campaign detail with email stats
-router.get('/campaigns/:id', (req, res) => {
-    const campaign = campaignData.campaigns.find((c) => c.id === req.params.id);
+router.get('/campaigns/:id', async (req, res) => {
+    const liveData = await getLiveData();
+    const allCampaigns = liveData ? liveData.campaigns : campaignData.campaigns;
+    const campaign = allCampaigns.find((c) => c.id === req.params.id);
     if (!campaign) {
         return res.status(404).json({ success: false, error: 'Campaign not found' });
     }

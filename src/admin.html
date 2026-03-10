@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — Campaign Data Entry</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #0a0e1a; --bg2: #111827; --bg3: #1a1f35;
+            --border: rgba(255,255,255,0.08); --text: #e2e8f0; --text2: #94a3b8;
+            --accent: #6366f1; --accent2: #818cf8; --green: #10b981; --red: #ef4444;
+            --orange: #f59e0b; --radius: 10px;
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+        /* PIN Screen */
+        .pin-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 20px; }
+        .pin-screen h1 { font-size: 1.5rem; color: var(--accent2); }
+        .pin-screen input { background: var(--bg2); border: 1px solid var(--border); color: var(--text); padding: 12px 16px; border-radius: var(--radius); font-size: 1rem; width: 240px; text-align: center; letter-spacing: 4px; }
+        .pin-screen input:focus { outline: none; border-color: var(--accent); }
+        .pin-screen button { background: var(--accent); color: white; border: none; padding: 12px 32px; border-radius: var(--radius); font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+        .pin-screen .error { color: var(--red); font-size: 0.85rem; }
+
+        /* Layout */
+        .admin { display: none; }
+        .admin.active { display: block; }
+        .header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .header h1 { font-size: 1.1rem; display: flex; align-items: center; gap: 10px; }
+        .header h1 span { color: var(--accent2); }
+        .header-actions { display: flex; gap: 10px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px 32px; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+        .tab { padding: 8px 18px; border-radius: 8px; background: var(--bg2); border: 1px solid var(--border); color: var(--text2); cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: all 0.2s; }
+        .tab:hover { border-color: var(--accent); }
+        .tab.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+        /* Cards */
+        .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+        .card-title { font-size: 0.95rem; font-weight: 600; margin-bottom: 16px; color: var(--accent2); display: flex; align-items: center; gap: 8px; }
+
+        /* Form */
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 0.72rem; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-group input, .form-group select, .form-group textarea {
+            background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+            padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; font-family: inherit;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--accent); }
+        .form-group input[type="number"] { font-variant-numeric: tabular-nums; }
+
+        /* Buttons */
+        .btn { padding: 8px 20px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; font-family: inherit; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: var(--accent2); }
+        .btn-success { background: var(--green); color: white; }
+        .btn-success:hover { opacity: 0.9; }
+        .btn-danger { background: var(--red); color: white; }
+        .btn-danger:hover { opacity: 0.9; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text2); }
+        .btn-outline:hover { border-color: var(--accent); color: var(--text); }
+
+        /* Toast */
+        .toast { position: fixed; bottom: 24px; right: 24px; padding: 14px 24px; border-radius: var(--radius); font-size: 0.85rem; font-weight: 500; z-index: 1000; animation: slideIn 0.3s ease; }
+        .toast.success { background: var(--green); color: white; }
+        .toast.error { background: var(--red); color: white; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Email card */
+        .email-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+        .email-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .email-header h3 { font-size: 0.9rem; font-weight: 600; }
+        .email-actions { display: flex; gap: 6px; }
+
+        /* Section divider */
+        .section-label { font-size: 0.7rem; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin: 16px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+
+        /* Campaign header */
+        .campaign-header { display: flex; gap: 12px; align-items: center; margin-bottom: 20px; }
+        .campaign-header input, .campaign-header select { flex: 1; }
+
+        /* Loading */
+        .loading { text-align: center; padding: 40px; color: var(--text2); }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .form-grid { grid-template-columns: 1fr 1fr; }
+            .container { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- PIN Screen -->
+    <div class="pin-screen" id="pinScreen">
+        <h1>🔒 Admin Access</h1>
+        <input type="password" id="pinInput" placeholder="Enter PIN" maxlength="20" autocomplete="off">
+        <button class="btn btn-primary" id="pinSubmit">Unlock</button>
+        <div class="error" id="pinError"></div>
+    </div>
+
+    <!-- Admin Panel -->
+    <div class="admin" id="adminPanel">
+        <div class="header">
+            <h1>📊 <span>Campaign Data Admin</span></h1>
+            <div class="header-actions">
+                <button class="btn btn-outline" id="loadDataBtn">↻ Reload</button>
+                <button class="btn btn-success" id="saveDataBtn">💾 Save to Live</button>
+            </div>
+        </div>
+
+        <div class="container">
+            <!-- Client tabs -->
+            <div class="tabs" id="clientTabs"></div>
+
+            <!-- Add client -->
+            <div style="margin-bottom: 24px; display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="newClientId" placeholder="Client ID (e.g. newclient)" style="background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; font-size: 0.85rem;">
+                <input type="text" id="newClientName" placeholder="Client Name" style="background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; font-size: 0.85rem;">
+                <input type="color" id="newClientColor" value="#6C63FF" style="height: 34px; border: none; cursor: pointer;">
+                <button class="btn btn-outline" id="addClientBtn">+ Add Client</button>
+            </div>
+
+            <!-- Campaign content area -->
+            <div id="campaignContent"></div>
+        </div>
+    </div>
+
+    <script>
+    // ── State ──────────────────────────────────────────────────
+    let pin = '';
+    let data = { clients: [], campaigns: [] };
+    let activeClient = null;
+
+    const API_BASE = '/api';
+
+    // ── PIN ───────────────────────────────────────────────────
+    document.getElementById('pinSubmit').addEventListener('click', tryPin);
+    document.getElementById('pinInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') tryPin(); });
+
+    function tryPin() {
+        pin = document.getElementById('pinInput').value;
+        if (!pin) { document.getElementById('pinError').textContent = 'Please enter the PIN'; return; }
+        // Verify by attempting to load data
+        loadData().then(ok => {
+            if (ok) {
+                document.getElementById('pinScreen').style.display = 'none';
+                document.getElementById('adminPanel').classList.add('active');
+                render();
+            } else {
+                document.getElementById('pinError').textContent = 'Invalid PIN or server error';
+            }
+        });
+    }
+
+    // ── Data Load/Save ────────────────────────────────────────
+    async function loadData() {
+        try {
+            const res = await fetch(`${API_BASE}/admin/data`, { headers: { 'x-admin-pin': pin } });
+            if (res.status === 401) return false;
+            const json = await res.json();
+            if (json.data) {
+                data = json.data;
+            } else {
+                // No live data yet — load defaults from campaigns API
+                const clientsRes = await fetch(`${API_BASE}/clients`);
+                const clientsJson = await clientsRes.json();
+                data.clients = clientsJson.data || [];
+
+                const campaignsRes = await fetch(`${API_BASE}/campaigns`);
+                const campaignsJson = await campaignsRes.json();
+                // Fetch full detail for each campaign
+                data.campaigns = [];
+                for (const c of campaignsJson.data || []) {
+                    const detailRes = await fetch(`${API_BASE}/campaigns/${c.id}`);
+                    const detailJson = await detailRes.json();
+                    if (detailJson.success) {
+                        data.campaigns.push({
+                            id: detailJson.data.id,
+                            client: detailJson.data.client || c.client,
+                            name: detailJson.data.name,
+                            status: detailJson.data.status,
+                            linkedAutomation: detailJson.data.linkedAutomation,
+                            emails: detailJson.data.emails || [],
+                        });
+                    }
+                }
+            }
+            return true;
+        } catch (err) {
+            console.error('Load failed:', err);
+            return false;
+        }
+    }
+
+    async function saveData() {
+        try {
+            const res = await fetch(`${API_BASE}/admin/data`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-admin-pin': pin },
+                body: JSON.stringify(data),
+            });
+            const json = await res.json();
+            if (json.success) {
+                showToast('✅ Saved to live dashboard!', 'success');
+            } else {
+                showToast('❌ ' + (json.error || 'Save failed'), 'error');
+            }
+        } catch (err) {
+            showToast('❌ Network error: ' + err.message, 'error');
+        }
+    }
+
+    // ── Render ────────────────────────────────────────────────
+    function render() {
+        renderClientTabs();
+        renderCampaigns();
+    }
+
+    function renderClientTabs() {
+        const tabs = document.getElementById('clientTabs');
+        tabs.innerHTML = '';
+        data.clients.forEach(c => {
+            const tab = document.createElement('div');
+            tab.className = 'tab' + (activeClient === c.id ? ' active' : '');
+            tab.innerHTML = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color};margin-right:6px;"></span>${c.name}`;
+            tab.onclick = () => { activeClient = c.id; render(); };
+            tabs.appendChild(tab);
+        });
+        if (!activeClient && data.clients.length > 0) {
+            activeClient = data.clients[0].id;
+            render();
+        }
+    }
+
+    function renderCampaigns() {
+        const container = document.getElementById('campaignContent');
+        const clientCampaigns = data.campaigns.filter(c => c.client === activeClient);
+        let html = '';
+
+        // Add campaign button
+        html += `<div style="margin-bottom:20px;">
+            <button class="btn btn-outline" onclick="addCampaign()">+ Add Campaign</button>
+        </div>`;
+
+        clientCampaigns.forEach((campaign, ci) => {
+            const globalIdx = data.campaigns.indexOf(campaign);
+            html += `<div class="card">
+                <div class="card-title">
+                    📧 Campaign: ${campaign.name}
+                    <button class="btn btn-danger" style="font-size:0.7rem;padding:4px 10px;margin-left:auto;" onclick="removeCampaign(${globalIdx})">Remove</button>
+                </div>
+                <div class="campaign-header">
+                    <div class="form-group" style="flex:1;">
+                        <label>Campaign ID</label>
+                        <input type="text" value="${campaign.id}" onchange="updateCampaign(${globalIdx},'id',this.value)">
+                    </div>
+                    <div class="form-group" style="flex:2;">
+                        <label>Campaign Name</label>
+                        <input type="text" value="${campaign.name}" onchange="updateCampaign(${globalIdx},'name',this.value)">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Status</label>
+                        <select onchange="updateCampaign(${globalIdx},'status',this.value)">
+                            <option value="Active" ${campaign.status==='Active'?'selected':''}>Active</option>
+                            <option value="Draft" ${campaign.status==='Draft'?'selected':''}>Draft</option>
+                            <option value="Completed" ${campaign.status==='Completed'?'selected':''}>Completed</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:12px;">
+                    <button class="btn btn-outline" style="font-size:0.78rem;" onclick="addEmail(${globalIdx})">+ Add Email</button>
+                </div>`;
+
+            campaign.emails.forEach((email, ei) => {
+                html += renderEmailForm(globalIdx, ei, email);
+            });
+
+            html += `</div>`;
+        });
+
+        container.innerHTML = html;
+    }
+
+    function renderEmailForm(campaignIdx, emailIdx, email) {
+        const prefix = `data.campaigns[${campaignIdx}].emails[${emailIdx}]`;
+        return `
+        <div class="email-card">
+            <div class="email-header">
+                <h3>✉️ Email ${emailIdx + 1}: ${email.subject || '(no subject)'}</h3>
+                <div class="email-actions">
+                    <button class="btn btn-danger" style="font-size:0.7rem;padding:3px 8px;" onclick="removeEmail(${campaignIdx},${emailIdx})">✕</button>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>Subject Line</label>
+                <input type="text" value="${escHtml(email.subject || '')}" onchange="updateEmail(${campaignIdx},${emailIdx},'subject',this.value)">
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>Send Date (YYYY-MM-DD)</label>
+                <input type="date" value="${email.sendDate || ''}" onchange="updateEmail(${campaignIdx},${emailIdx},'sendDate',this.value)">
+            </div>
+
+            <div class="section-label">📤 Delivery Stats</div>
+            <div class="form-grid">
+                <div class="form-group"><label>Sent</label><input type="number" value="${email.sent||0}" onchange="updateEmail(${campaignIdx},${emailIdx},'sent',+this.value)"></div>
+                <div class="form-group"><label>Delivered</label><input type="number" value="${email.delivered||0}" onchange="updateEmail(${campaignIdx},${emailIdx},'delivered',+this.value)"></div>
+                <div class="form-group"><label>Bounced</label><input type="number" value="${email.bounced||0}" onchange="updateEmail(${campaignIdx},${emailIdx},'bounced',+this.value)"></div>
+                <div class="form-group"><label>Unsubscribed</label><input type="number" value="${email.unsubscribed||0}" onchange="updateEmail(${campaignIdx},${emailIdx},'unsubscribed',+this.value)"></div>
+                <div class="form-group"><label>Spam</label><input type="number" value="${email.spam||0}" onchange="updateEmail(${campaignIdx},${emailIdx},'spam',+this.value)"></div>
+                <div class="form-group"><label>Not Sent</label><input type="number" value="${email.notSent||0}" onchange="updateEmail(${campaignIdx},${emailIdx},'notSent',+this.value)"></div>
+            </div>
+
+            <div class="section-label">📊 Engagement Stats</div>
+            <div class="form-grid">
+                <div class="form-group"><label>Unique Opens</label><input type="number" value="${email.uniqueOpens||0}" onchange="updateEmail(${campaignIdx},${emailIdx},'uniqueOpens',+this.value)"></div>
+                <div class="form-group"><label>Total Opens</label><input type="number" value="${email.totalOpens||0}" onchange="updateEmail(${campaignIdx},${emailIdx},'totalOpens',+this.value)"></div>
+                <div class="form-group"><label>Unique Clicks</label><input type="number" value="${email.uniqueClicks||0}" onchange="updateEmail(${campaignIdx},${emailIdx},'uniqueClicks',+this.value)"></div>
+                <div class="form-group"><label>Total Clicks</label><input type="number" value="${email.totalClicks||0}" onchange="updateEmail(${campaignIdx},${emailIdx},'totalClicks',+this.value)"></div>
+                <div class="form-group"><label>Replied</label><input type="number" value="${email.replied||0}" onchange="updateEmail(${campaignIdx},${emailIdx},'replied',+this.value)"></div>
+            </div>
+
+            <div class="section-label">📈 Rates (auto-calculated if left as 0)</div>
+            <div class="form-grid">
+                <div class="form-group"><label>Open Rate %</label><input type="number" step="0.01" value="${email.openRate||0}" onchange="updateEmail(${campaignIdx},${emailIdx},'openRate',+this.value)"></div>
+                <div class="form-group"><label>Click Rate %</label><input type="number" step="0.01" value="${email.clickRate||0}" onchange="updateEmail(${campaignIdx},${emailIdx},'clickRate',+this.value)"></div>
+                <div class="form-group"><label>Click-Through Rate %</label><input type="number" step="0.01" value="${email.clickThroughRate||0}" onchange="updateEmail(${campaignIdx},${emailIdx},'clickThroughRate',+this.value)"></div>
+                <div class="form-group"><label>Reply Rate %</label><input type="number" step="0.01" value="${email.replyRate||0}" onchange="updateEmail(${campaignIdx},${emailIdx},'replyRate',+this.value)"></div>
+            </div>
+        </div>`;
+    }
+
+    // ── Actions ───────────────────────────────────────────────
+    function updateCampaign(idx, field, value) { data.campaigns[idx][field] = value; }
+    function updateEmail(campIdx, emailIdx, field, value) { data.campaigns[campIdx].emails[emailIdx][field] = value; }
+
+    function addCampaign() {
+        const id = prompt('Campaign ID (e.g. MTG010):');
+        if (!id) return;
+        const name = prompt('Campaign Name:') || id + ' - Campaign';
+        data.campaigns.push({
+            id, client: activeClient, name, status: 'Active', linkedAutomation: null,
+            emails: [],
+        });
+        render();
+    }
+
+    function removeCampaign(idx) {
+        if (!confirm('Remove this campaign?')) return;
+        data.campaigns.splice(idx, 1);
+        render();
+    }
+
+    function addEmail(campIdx) {
+        data.campaigns[campIdx].emails.push({
+            id: data.campaigns[campIdx].id + '-E' + (data.campaigns[campIdx].emails.length + 1),
+            subject: '', sendDate: new Date().toISOString().split('T')[0],
+            sent: 0, delivered: 0, bounced: 0, unsubscribed: 0, spam: 0, notSent: 0,
+            uniqueOpens: 0, totalOpens: 0, uniqueClicks: 0, totalClicks: 0, replied: 0,
+            openRate: 0, clickRate: 0, clickThroughRate: 0, replyRate: 0,
+            links: [], locations: [], performanceOverTime: [],
+        });
+        render();
+    }
+
+    function removeEmail(campIdx, emailIdx) {
+        if (!confirm('Remove this email?')) return;
+        data.campaigns[campIdx].emails.splice(emailIdx, 1);
+        render();
+    }
+
+    document.getElementById('addClientBtn').addEventListener('click', () => {
+        const id = document.getElementById('newClientId').value.trim().toLowerCase();
+        const name = document.getElementById('newClientName').value.trim();
+        const color = document.getElementById('newClientColor').value;
+        if (!id || !name) { showToast('Client ID and Name are required', 'error'); return; }
+        if (data.clients.find(c => c.id === id)) { showToast('Client ID already exists', 'error'); return; }
+        data.clients.push({ id, name, color });
+        activeClient = id;
+        document.getElementById('newClientId').value = '';
+        document.getElementById('newClientName').value = '';
+        render();
+        showToast(`Client "${name}" added`, 'success');
+    });
+
+    document.getElementById('saveDataBtn').addEventListener('click', saveData);
+    document.getElementById('loadDataBtn').addEventListener('click', async () => {
+        await loadData();
+        render();
+        showToast('Data reloaded', 'success');
+    });
+
+    // ── Helpers ───────────────────────────────────────────────
+    function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    function showToast(msg, type = 'success') {
+        const el = document.createElement('div');
+        el.className = 'toast ' + type;
+        el.textContent = msg;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 3000);
+    }
+    </script>
+</body>
+</html>
