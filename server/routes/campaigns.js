@@ -9,10 +9,17 @@ const path = require('path');
 // Replace with live API calls when/if Pipedrive exposes campaign endpoints
 // ─────────────────────────────────────────────────────────────
 
+// Client definitions
+const clients = [
+    { id: 'montage', name: 'Montage', color: '#6C63FF' },
+    { id: 'institugen', name: 'Institugen', color: '#00C9A7' },
+];
+
 const campaignData = {
     campaigns: [
         {
             id: 'ist021',
+            client: 'institugen',
             name: 'IST021: Vet Clinics > Education',
             status: 'ACTIVE',
             linkedAutomation: 'IST021: Vet Clinics > Education (E1&2) | Active',
@@ -36,7 +43,7 @@ const campaignData = {
                     clickRate: 1.66,
                     clickThroughRate: 2.70,
                     replyRate: 0,
-                    sendDate: '2026-03-16',
+                    sendDate: '2026-03-05',
                     links: [
                         {
                             url: 'https://neuterready.vet/?utm_source=email&utm_medium=edm&utm_campaign=educational_campaign',
@@ -51,19 +58,20 @@ const campaignData = {
                         { country: 'United States', code: 'US', uniqueOpens: 14, percentOfOpens: 3.44 },
                     ],
                     performanceOverTime: [
-                        { date: '2026-03-16', campaignsSent: 1, uniqueClicks: 4, uniqueOpens: 3 },
-                        { date: '2026-03-17', campaignsSent: 0, uniqueClicks: 2, uniqueOpens: 2 },
-                        { date: '2026-03-18', campaignsSent: 0, uniqueClicks: 1, uniqueOpens: 1 },
-                        { date: '2026-03-19', campaignsSent: 0, uniqueClicks: 1, uniqueOpens: 1 },
-                        { date: '2026-03-20', campaignsSent: 0, uniqueClicks: 0, uniqueOpens: 0 },
-                        { date: '2026-03-21', campaignsSent: 0, uniqueClicks: 1, uniqueOpens: 1 },
-                        { date: '2026-03-22', campaignsSent: 0, uniqueClicks: 0, uniqueOpens: 0 },
+                        { date: '2026-03-05', campaignsSent: 1, uniqueClicks: 4, uniqueOpens: 3 },
+                        { date: '2026-03-06', campaignsSent: 0, uniqueClicks: 2, uniqueOpens: 2 },
+                        { date: '2026-03-07', campaignsSent: 0, uniqueClicks: 1, uniqueOpens: 1 },
+                        { date: '2026-03-08', campaignsSent: 0, uniqueClicks: 1, uniqueOpens: 1 },
+                        { date: '2026-03-09', campaignsSent: 0, uniqueClicks: 0, uniqueOpens: 0 },
+                        { date: '2026-03-10', campaignsSent: 0, uniqueClicks: 1, uniqueOpens: 1 },
+                        { date: '2026-03-11', campaignsSent: 0, uniqueClicks: 0, uniqueOpens: 0 },
                     ],
                 },
             ],
         },
         {
             id: 'mtg005',
+            client: 'montage',
             name: 'MTG005 - Campaign Emails',
             status: 'ACTIVE',
             linkedAutomation: 'MTG005: Montage Campaign Series',
@@ -174,6 +182,7 @@ const campaignData = {
         },
         {
             id: 'mtg008',
+            client: 'montage',
             name: 'MTG008 - Campaign Emails',
             status: 'ACTIVE',
             linkedAutomation: 'MTG008: Montage Campaign Series',
@@ -387,10 +396,20 @@ const campaignData = {
     ],
 };
 
-// GET /api/campaigns — list all campaigns
+// GET /api/clients — list available clients
+router.get('/clients', (req, res) => {
+    res.json({ success: true, data: clients });
+});
+
+// GET /api/campaigns — list all campaigns (optionally filtered by ?client=)
 router.get('/campaigns', (req, res) => {
-    const summary = campaignData.campaigns.map((c) => ({
+    let filtered = campaignData.campaigns;
+    if (req.query.client) {
+        filtered = filtered.filter((c) => c.client === req.query.client);
+    }
+    const summary = filtered.map((c) => ({
         id: c.id,
+        client: c.client,
         name: c.name,
         status: c.status,
         emailCount: c.emails.length,

@@ -4,8 +4,16 @@
 
 const API_BASE = '/api';
 
-export async function fetchCampaigns() {
-    const res = await fetch(`${API_BASE}/campaigns`);
+export async function fetchClients() {
+    const res = await fetch(`${API_BASE}/clients`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to fetch clients');
+    return json.data;
+}
+
+export async function fetchCampaigns(client) {
+    const params = client ? `?client=${encodeURIComponent(client)}` : '';
+    const res = await fetch(`${API_BASE}/campaigns${params}`);
     const json = await res.json();
     if (!json.success) throw new Error(json.error || 'Failed to fetch campaigns');
     return json.data;
