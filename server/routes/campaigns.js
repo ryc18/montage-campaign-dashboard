@@ -125,7 +125,7 @@ const campaignData = {
                     clickRate: 8.65,
                     clickThroughRate: 13.90,
                     replyRate: 1.05,
-                    sendDate: '2026-01-13',
+                    sendDate: '2026-03-03',
                     links: [],
                     locations: [
                         { country: 'New Zealand', code: 'NZ', uniqueOpens: 245, percentOfOpens: 78.53 },
@@ -159,7 +159,7 @@ const campaignData = {
                     clickRate: 7.53,
                     clickThroughRate: 10.89,
                     replyRate: 0.81,
-                    sendDate: '2026-01-20',
+                    sendDate: '2026-03-05',
                     links: [],
                     locations: [
                         { country: 'New Zealand', code: 'NZ', uniqueOpens: 231, percentOfOpens: 79.93 },
@@ -193,7 +193,7 @@ const campaignData = {
                     clickRate: 8.81,
                     clickThroughRate: 15.22,
                     replyRate: 1.57,
-                    sendDate: '2026-01-27',
+                    sendDate: '2026-03-07',
                     links: [],
                     locations: [
                         { country: 'New Zealand', code: 'NZ', uniqueOpens: 210, percentOfOpens: 78.65 },
