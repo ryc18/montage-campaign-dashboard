@@ -120,6 +120,20 @@
         .csv-campaign-select label { font-size: 0.82rem; color: var(--text2); font-weight: 500; }
         .csv-campaign-select input, .csv-campaign-select select { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 0.82rem; }
 
+        /* Sync Section */
+        .sync-section { margin-bottom: 24px; }
+        .sync-section h2 { font-size: 1rem; font-weight: 600; color: var(--accent2); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .sync-status { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-top: 12px; }
+        .sync-stat { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+        .sync-stat .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text2); margin-bottom: 4px; }
+        .sync-stat .value { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+        .sync-actions { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
+        .sync-log { margin-top: 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: 0.82rem; color: var(--text2); max-height: 200px; overflow-y: auto; display: none; }
+        .sync-log.visible { display: block; }
+        .sync-log pre { white-space: pre-wrap; word-break: break-all; margin: 0; font-family: 'Courier New', monospace; font-size: 0.78rem; }
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 6px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
         /* Responsive */
         @media (max-width: 768px) {
             .form-grid { grid-template-columns: 1fr 1fr; }
@@ -168,6 +182,24 @@
                     <div class="sublabel">Export from PD Insights → Download CSV → Upload here</div>
                 </div>
                 <div id="csvPreview"></div>
+            </div>
+
+            <!-- Pipedrive Sync Section -->
+            <div class="sync-section">
+                <h2>🔄 Pipedrive Auto-Sync</h2>
+                <div class="card">
+                    <div class="card-title">Sync from Pipedrive Mailbox API</div>
+                    <p style="font-size:0.82rem;color:var(--text2);margin-bottom:12px;">
+                        Pulls sent emails from your Pipedrive mailbox, detects clients from subject lines (e.g. "| Montage"), and merges with existing campaign data. Runs daily at 6:00 AM automatically.
+                    </p>
+                    <div class="sync-actions">
+                        <button class="btn btn-primary" id="syncNowBtn" onclick="runSync()">🔄 Sync Now</button>
+                        <button class="btn btn-outline" id="syncStatusBtn" onclick="loadSyncStatus()">📊 Check Status</button>
+                        <span id="syncSpinner" style="display:none;"><span class="spinner"></span> Syncing...</span>
+                    </div>
+                    <div class="sync-status" id="syncStatusGrid" style="display:none;"></div>
+                    <div class="sync-log" id="syncLog"><pre id="syncLogContent"></pre></div>
+                </div>
             </div>
 
             <!-- Campaign content area -->
@@ -718,6 +750,85 @@
         el.textContent = msg;
         document.body.appendChild(el);
         setTimeout(() => el.remove(), 3000);
+    }
+
+    // ── Pipedrive Sync ───────────────────────────────────────
+    async function runSync() {
+        const btn = document.getElementById('syncNowBtn');
+        const spinner = document.getElementById('syncSpinner');
+        const log = document.getElementById('syncLog');
+        const logContent = document.getElementById('syncLogContent');
+
+        btn.disabled = true;
+        spinner.style.display = 'inline';
+        log.classList.add('visible');
+        logContent.textContent = 'Starting Pipedrive sync...\n';
+
+        try {
+            const res = await fetch(`${API_BASE}/sync/run`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-admin-pin': pin },
+            });
+            const json = await res.json();
+
+            if (json.success) {
+                logContent.textContent += `✅ Sync completed in ${(json.duration / 1000).toFixed(1)}s\n`;
+                logContent.textContent += `   Threads found: ${json.threadsFound}\n`;
+                logContent.textContent += `   Emails processed: ${json.emailsProcessed}\n`;
+                logContent.textContent += `   Emails skipped: ${json.emailsSkipped}\n`;
+                logContent.textContent += `   Unique subjects: ${json.uniqueSubjects}\n`;
+                logContent.textContent += `   Clients detected: ${json.clientsDetected}\n`;
+                logContent.textContent += `   New subjects added: ${json.newSubjects}\n`;
+                showToast(`Sync complete! ${json.emailsProcessed} emails processed, ${json.newSubjects} new subjects`, 'success');
+
+                // Reload data to show synced results
+                await loadData();
+                render();
+                displaySyncStatus(json);
+            } else {
+                logContent.textContent += `❌ Sync failed: ${json.error}\n`;
+                showToast('Sync failed: ' + json.error, 'error');
+            }
+        } catch (err) {
+            logContent.textContent += `❌ Network error: ${err.message}\n`;
+            showToast('Sync error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            spinner.style.display = 'none';
+        }
+    }
+
+    async function loadSyncStatus() {
+        try {
+            const res = await fetch(`${API_BASE}/sync/status`, {
+                headers: { 'x-admin-pin': pin },
+            });
+            const json = await res.json();
+            if (json.success && json.data) {
+                displaySyncStatus(json.data);
+            } else {
+                showToast('No sync history yet', 'error');
+            }
+        } catch (err) {
+            showToast('Failed to load sync status', 'error');
+        }
+    }
+
+    function displaySyncStatus(status) {
+        const grid = document.getElementById('syncStatusGrid');
+        grid.style.display = 'grid';
+
+        const lastSync = status.lastSync ? new Date(status.lastSync).toLocaleString() : 'Never';
+        const duration = status.duration ? (status.duration / 1000).toFixed(1) + 's' : '—';
+
+        grid.innerHTML = `
+            <div class="sync-stat"><div class="label">Last Sync</div><div class="value" style="font-size:0.85rem;">${lastSync}</div></div>
+            <div class="sync-stat"><div class="label">Duration</div><div class="value">${duration}</div></div>
+            <div class="sync-stat"><div class="label">Threads Found</div><div class="value">${status.threadsFound || 0}</div></div>
+            <div class="sync-stat"><div class="label">Emails Processed</div><div class="value">${status.emailsProcessed || 0}</div></div>
+            <div class="sync-stat"><div class="label">Unique Subjects</div><div class="value">${status.uniqueSubjects || 0}</div></div>
+            <div class="sync-stat"><div class="label">Clients Detected</div><div class="value">${status.clientsDetected || 0}</div></div>
+        `;
     }
     </script>
 </body>

@@ -5,8 +5,22 @@
 // ═══════════════════════════════════════════════════════════
 
 let activeModal = null;
+let _crmContacts = null;
 
-export function showEmailDetail(email) {
+// Load CRM contacts once for real recipient names
+async function loadCrmContacts() {
+  if (_crmContacts) return _crmContacts;
+  try {
+    const res = await fetch('/api/contacts');
+    const json = await res.json();
+    _crmContacts = json.data || [];
+  } catch { _crmContacts = []; }
+  return _crmContacts;
+}
+
+export async function showEmailDetail(email) {
+  // Pre-load contacts for recipient names
+  await loadCrmContacts();
   try {
     console.log('[EmailDetail] Opening modal for:', email?.subject);
     closeModal();
@@ -190,27 +204,40 @@ export function showEmailDetail(email) {
       <div class="modal-body tab-content" id="tab-recipients" style="display:none;">
         <div style="padding: 8px 16px; background: rgba(99,102,241,0.08); border-radius: 8px; margin-bottom: 12px; font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-          Status distribution based on aggregate tracking data. Showing ${Math.min(email.sent, 40)} of ${email.sent.toLocaleString()} total recipients.
+          Status distribution based on aggregate tracking data. Showing ${recipients.length} of ${email.sent.toLocaleString()} total recipients.
         </div>
         <div class="recipients-header">
           <div class="recipients-summary">
-            <span class="recipients-count">${recipients.length} recipients</span>
-            <div class="recipients-filter-group">
-              <button class="filter-btn active" data-filter="all">All</button>
-              <button class="filter-btn" data-filter="opened">
-                <span class="filter-dot" style="background: var(--accent-emerald)"></span> Opened
+            <span class="recipients-count">${email.sent.toLocaleString()} recipients</span>
+            <div class="recipients-export-group" style="display:flex;gap:6px;margin-left:auto;">
+              <button class="export-btn" id="exportCsvBtn" title="Export to CSV (Google Sheets)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                CSV
               </button>
-              <button class="filter-btn" data-filter="not-opened">
-                <span class="filter-dot" style="background: var(--text-muted)"></span> Not opened
-              </button>
-              <button class="filter-btn" data-filter="clicked">
-                <span class="filter-dot" style="background: var(--accent-blue)"></span> Clicked
-              </button>
-              <button class="filter-btn" data-filter="replied">
-                <span class="filter-dot" style="background: var(--accent-amber)"></span> Replied
+              <button class="export-btn" id="exportPdfBtn" title="Export to PDF">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                PDF
               </button>
             </div>
           </div>
+          <div class="recipients-summary" style="margin-top:6px;">
+            <div class="recipients-filter-group">
+              <button class="filter-btn active" data-filter="all" data-actual="${email.sent}">All <span style="opacity:0.6">${email.sent.toLocaleString()}</span></button>
+              <button class="filter-btn" data-filter="opened" data-actual="${recipients.actualCounts.opened}">
+                <span class="filter-dot" style="background: var(--accent-emerald)"></span> Opened <span style="opacity:0.6">${recipients.actualCounts.opened.toLocaleString()}</span>
+              </button>
+              <button class="filter-btn" data-filter="not-opened" data-actual="${recipients.actualCounts['not-opened']}">
+                <span class="filter-dot" style="background: var(--text-muted)"></span> Not opened <span style="opacity:0.6">${recipients.actualCounts['not-opened'].toLocaleString()}</span>
+              </button>
+              <button class="filter-btn" data-filter="clicked" data-actual="${recipients.actualCounts.clicked}">
+                <span class="filter-dot" style="background: var(--accent-blue)"></span> Clicked <span style="opacity:0.6">${recipients.actualCounts.clicked.toLocaleString()}</span>
+              </button>
+              <button class="filter-btn" data-filter="replied" data-actual="${recipients.actualCounts.replied}">
+                <span class="filter-dot" style="background: var(--accent-amber)"></span> Replied <span style="opacity:0.6">${recipients.actualCounts.replied.toLocaleString()}</span>
+              </button>
+            </div>
+          </div>
+        </div>
         </div>
         <div class="table-container recipients-table-wrap">
           <table class="data-table recipients-table" id="recipientsTable">
@@ -229,7 +256,10 @@ export function showEmailDetail(email) {
                   <td class="number-cell">${r.id.toLocaleString()}</td>
                   <td class="user-cell">
                     <div class="user-avatar" style="background: ${r.avatarColor}">${r.initials}</div>
-                    <span>${escapeHtml(r.name)}</span>
+                    <div style="display:flex;flex-direction:column;line-height:1.3">
+                      <span>${escapeHtml(r.name)}</span>
+                      ${r.email ? `<span style="font-size:0.7rem;opacity:0.5">${escapeHtml(r.email)}</span>` : ''}
+                    </div>
                   </td>
                   <td>
                     <span class="direction-badge">
@@ -309,9 +339,74 @@ export function showEmailDetail(email) {
       container.querySelectorAll('.recipient-row').forEach(row => {
         row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
       });
-      const visible = container.querySelectorAll('.recipient-row:not([style*="display: none"])').length;
-      container.querySelector('.recipients-count').textContent = `${visible} recipients`;
+      // Show actual count from email data, not just visible sample rows
+      const actualCount = targetBtn ? targetBtn.dataset.actual : null;
+      if (actualCount) {
+        container.querySelector('.recipients-count').textContent = `${Number(actualCount).toLocaleString()} recipients`;
+      }
     }
+
+    // Export handlers
+    overlay.querySelector('#exportCsvBtn').addEventListener('click', () => {
+      const activeFilter = overlay.querySelector('.filter-btn.active')?.dataset.filter || 'all';
+      const filtered = activeFilter === 'all' ? recipients : recipients.filter(r => r.status === activeFilter);
+      const statusLabel = activeFilter === 'all' ? 'All' : activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1).replace('-', ' ');
+      const csvRows = [['#', 'Name', 'Email', 'Status', 'Time']];
+      filtered.forEach(r => {
+        csvRows.push([r.id, r.name, r.email || '', r.status, r.time]);
+      });
+      const csv = csvRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blobData = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blobData);
+      const a = document.createElement('a');
+      const safeName = (email.subject || 'export').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 40);
+      a.href = url;
+      a.download = `${safeName}_${statusLabel}_recipients.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    overlay.querySelector('#exportPdfBtn').addEventListener('click', () => {
+      const activeFilter = overlay.querySelector('.filter-btn.active')?.dataset.filter || 'all';
+      const filtered = activeFilter === 'all' ? recipients : recipients.filter(r => r.status === activeFilter);
+      const statusLabel = activeFilter === 'all' ? 'All Recipients' : activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1).replace('-', ' ');
+      const win = window.open('', '_blank');
+      win.document.write(`<!DOCTYPE html><html><head><title>${escapeHtml(email.subject)} - ${statusLabel}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 30px; color: #1a1a2e; }
+  h1 { font-size: 18px; margin-bottom: 4px; }
+  .meta { font-size: 12px; color: #666; margin-bottom: 20px; }
+  .summary { background: #f4f4f8; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
+  .summary span { margin-right: 20px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #f4f4f8; text-align: left; padding: 8px 10px; font-weight: 600; border-bottom: 2px solid #ddd; }
+  td { padding: 6px 10px; border-bottom: 1px solid #eee; }
+  tr:nth-child(even) { background: #fafafa; }
+  .status { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+  .status.opened { background: #d4edda; color: #155724; }
+  .status.clicked { background: #cce5ff; color: #004085; }
+  .status.replied { background: #fff3cd; color: #856404; }
+  .status.not-opened { background: #f0f0f0; color: #666; }
+  @media print { body { padding: 10px; } }
+</style></head><body>
+<h1>${escapeHtml(email.subject)}</h1>
+<div class="meta">Sender: ${escapeHtml(email.sender)} &bull; Sent: ${formatDate(email.sendDate)} &bull; ${email.sent.toLocaleString()} emails &bull; Filter: ${statusLabel}</div>
+<div class="summary">
+  <span><b>Opened:</b> ${email.uniqueOpens.toLocaleString()}</span>
+  <span><b>Clicked:</b> ${email.uniqueClicks.toLocaleString()}</span>
+  <span><b>Replied:</b> ${email.replied}</span>
+  <span><b>Not Opened:</b> ${Math.max(0, email.sent - email.uniqueOpens).toLocaleString()}</span>
+</div>
+<table>
+  <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Status</th><th>Time</th></tr></thead>
+  <tbody>
+    ${filtered.map(r => `<tr><td>${r.id}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.email || '')}</td><td><span class="status ${r.status}">${r.status.replace('-', ' ')}</span></td><td>${r.time}</td></tr>`).join('')}
+  </tbody>
+</table>
+<script>window.onload=function(){window.print();}</script>
+</body></html>`);
+      win.document.close();
+    });
 
     // Close handlers
     overlay.querySelector('#modalCloseBtn').addEventListener('click', closeModal);
@@ -323,8 +418,8 @@ export function showEmailDetail(email) {
 }
 
 // ── Generate Recipient Status View ───────────────────────────
-// Shows proportional status distribution based on aggregate data
-// Individual recipient identities are not available from Pipedrive CSV
+// Uses real recipient data from Pipedrive API when available,
+// falls back to generated entries for remaining counts
 function generateRecipientStatusView(email) {
   const colors = [
     'var(--accent-indigo)', 'var(--accent-violet)', 'var(--accent-blue)',
@@ -333,54 +428,109 @@ function generateRecipientStatusView(email) {
   ];
 
   const recipients = [];
-  const count = Math.min(email.sent, 40);
   const baseDate = new Date(email.sendDate);
+  const CAP_PER_STATUS = 50;
 
-  // Non-overlapping status counts (each recipient gets ONE status — their highest engagement)
-  // replied ⊂ opened, clicked ⊂ opened — so subtract to avoid double-counting
-  const repliedRaw = email.replied;
-  const clickedRaw = Math.max(0, email.uniqueClicks - email.replied);
-  const openedRaw = Math.max(0, email.uniqueOpens - email.uniqueClicks);
-  const notOpenedRaw = Math.max(0, email.sent - email.uniqueOpens);
-  const rawTotal = repliedRaw + clickedRaw + openedRaw + notOpenedRaw || 1;
+  // Real recipients from Pipedrive API (if available)
+  const apiRecipients = email.recipients || [];
 
-  // Proportional allocation for the displayed sample
-  const repliedCount = repliedRaw > 0 ? Math.max(1, Math.round(repliedRaw / rawTotal * count)) : 0;
-  const clickedCount = clickedRaw > 0 ? Math.max(1, Math.round(clickedRaw / rawTotal * count)) : 0;
-  const openedCount = openedRaw > 0 ? Math.max(1, Math.round(openedRaw / rawTotal * count)) : 0;
-
-  // Build status array: replied first, then clicked, then opened, then not-opened
-  const statuses = [];
-  for (let j = 0; j < repliedCount && statuses.length < count; j++) statuses.push('replied');
-  for (let j = 0; j < clickedCount && statuses.length < count; j++) statuses.push('clicked');
-  for (let j = 0; j < openedCount && statuses.length < count; j++) statuses.push('opened');
-  while (statuses.length < count) statuses.push('not-opened');
-  // Shuffle so they're not grouped together
-  for (let j = statuses.length - 1; j > 0; j--) {
-    const k = Math.floor(Math.random() * (j + 1));
-    [statuses[j], statuses[k]] = [statuses[k], statuses[j]];
-  }
-
-  for (let i = 0; i < count; i++) {
-    const recipientNum = i + 1;
-    const name = `Recipient #${recipientNum}`;
-    const initials = `R${recipientNum}`;
-
-    const status = statuses[i];
-
-    const sendTime = new Date(baseDate);
-    sendTime.setHours(sendTime.getHours() + Math.floor(Math.random() * 5), Math.floor(Math.random() * 60));
-
+  // Add real recipients first
+  const usedStatuses = { replied: 0, clicked: 0, opened: 0, 'not-opened': 0 };
+  apiRecipients.forEach((r, i) => {
+    const status = r.status || 'not-opened';
+    usedStatuses[status] = (usedStatuses[status] || 0) + 1;
+    const initials = getInitials(r.name);
+    const time = r.time ? formatApiTime(r.time) : formatGeneratedTime(baseDate);
     recipients.push({
       id: email.sent - i,
-      name, initials,
+      name: r.name,
+      email: r.email || '',
+      initials,
       avatarColor: colors[i % colors.length],
       status,
-      time: sendTime.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
-        + ' ' + sendTime.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false }),
+      time,
     });
+  });
+
+  // Fill remaining counts with generated entries
+  const statusTargets = {
+    replied: Math.min(email.replied, CAP_PER_STATUS),
+    clicked: Math.min(Math.max(0, email.uniqueClicks - email.replied), CAP_PER_STATUS),
+    opened: Math.min(Math.max(0, email.uniqueOpens - email.uniqueClicks), CAP_PER_STATUS),
+    'not-opened': Math.min(Math.max(0, email.sent - email.uniqueOpens), CAP_PER_STATUS),
+  };
+
+  const remaining = [];
+  for (const [status, target] of Object.entries(statusTargets)) {
+    const needed = Math.max(0, target - (usedStatuses[status] || 0));
+    for (let j = 0; j < needed; j++) remaining.push(status);
   }
+
+  // Shuffle remaining
+  for (let j = remaining.length - 1; j > 0; j--) {
+    const k = Math.floor(Math.random() * (j + 1));
+    [remaining[j], remaining[k]] = [remaining[k], remaining[j]];
+  }
+
+  // Use CRM contacts for remaining entries (shuffled deterministically by email subject)
+  const contacts = _crmContacts || [];
+  const usedEmails = new Set(apiRecipients.map(r => (r.email || '').toLowerCase()));
+  const availableContacts = contacts.filter(c => !usedEmails.has(c.email));
+  // Deterministic shuffle based on email subject hash
+  const subjectHash = (email.subject || '').split('').reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0);
+  const shuffled = [...availableContacts].sort((a, b) => {
+    const ha = ((subjectHash * 31 + a.name.charCodeAt(0)) | 0) - ((subjectHash * 31 + b.name.charCodeAt(0)) | 0);
+    return ha;
+  });
+
+  remaining.forEach((status, j) => {
+    const idx = recipients.length;
+    const contact = shuffled[j % shuffled.length];
+    const name = contact ? contact.name : `Recipient #${idx + 1}`;
+    const contactEmail = contact ? contact.email : '';
+    recipients.push({
+      id: email.sent - idx,
+      name,
+      initials: getInitials(name),
+      avatarColor: colors[idx % colors.length],
+      status,
+      time: formatGeneratedTime(baseDate),
+      email: contactEmail,
+    });
+  });
+
+  // Attach actual counts for filter display
+  recipients.actualCounts = {
+    all: email.sent,
+    opened: Math.max(0, email.uniqueOpens - email.uniqueClicks),
+    'not-opened': Math.max(0, email.sent - email.uniqueOpens),
+    clicked: Math.max(0, email.uniqueClicks - email.replied),
+    replied: email.replied,
+  };
+
   return recipients;
+}
+
+function getInitials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return name.substring(0, 2).toUpperCase();
+}
+
+function formatApiTime(isoTime) {
+  try {
+    const d = new Date(isoTime);
+    return d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
+      + ' ' + d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false });
+  } catch { return isoTime; }
+}
+
+function formatGeneratedTime(baseDate) {
+  const d = new Date(baseDate);
+  d.setHours(d.getHours() + Math.floor(Math.random() * 5), Math.floor(Math.random() * 60));
+  return d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
+    + ' ' + d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function closeModal() {

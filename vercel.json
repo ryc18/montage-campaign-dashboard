@@ -7,5 +7,11 @@
             "source": "/api/(.*)",
             "destination": "/api"
         }
+    ],
+    "crons": [
+        {
+            "path": "/api/sync/run",
+            "schedule": "0 6 * * *"
+        }
     ]
 }

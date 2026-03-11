@@ -1,5 +1,11 @@
 node_modules
 .env
+.env.*
 dist
 .vercel
+*.local
+campaign-data-*.json
+mtg*.json
+ist*.json
+clients.json
 .env*.local

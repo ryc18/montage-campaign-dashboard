@@ -60,6 +60,13 @@ router.get('/campaigns', async (req, res) => {
     res.json({ success: true, data: summary });
 });
 
+// GET /api/contacts — CRM contact names for recipient display
+router.get('/contacts', async (req, res) => {
+    const liveData = await getLiveData();
+    const contacts = liveData?.contacts || [];
+    res.json({ success: true, data: contacts });
+});
+
 // GET /api/campaigns/:id — full campaign detail with email stats
 router.get('/campaigns/:id', async (req, res) => {
     const liveData = await getLiveData();

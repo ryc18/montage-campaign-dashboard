@@ -239,8 +239,13 @@ async function loadCampaignData(id, silent = false) {
 
     try {
         const data = await fetchCampaignDetail(id);
-        // Filter emails by date range
-        const filteredEmails = filterEmailsByDate(data.emails, activeDateRange);
+        // Filter emails by date range; auto-expand to YTD if no results
+        let filteredEmails = filterEmailsByDate(data.emails, activeDateRange);
+        if (filteredEmails.length === 0 && data.emails.length > 0) {
+            filteredEmails = filterEmailsByDate(data.emails, 'ytd');
+            activeDateRange = 'ytd';
+            dateRangeSelect.value = 'ytd';
+        }
         const filteredData = { ...data, emails: filteredEmails };
 
         // Recalculate aggregated stats for filtered emails
