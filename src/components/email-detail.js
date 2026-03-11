@@ -201,6 +201,9 @@ export function showEmailDetail(email) {
               <button class="filter-btn" data-filter="clicked">
                 <span class="filter-dot" style="background: var(--accent-blue)"></span> Clicked
               </button>
+              <button class="filter-btn" data-filter="replied">
+                <span class="filter-dot" style="background: var(--accent-amber)"></span> Replied
+              </button>
             </div>
           </div>
         </div>
@@ -232,7 +235,8 @@ export function showEmailDetail(email) {
                   <td class="time-cell">${r.time}</td>
                   <td>
                     <span class="tracking-badge ${r.status}">
-                      ${r.status === 'opened' ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Opened` :
+                      ${r.status === 'replied' ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg> Replied` :
+          r.status === 'opened' ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Opened` :
           r.status === 'clicked' ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> Clicked` :
             `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg> Not opened`}
                     </span>
@@ -324,9 +328,14 @@ function generateRecipients(email) {
 
     let status;
     const rand = Math.random() * 100;
-    if (rand < (email.uniqueClicks / email.sent * 100)) {
+    const replyPct = email.replied && email.sent > 0 ? (email.replied / email.sent * 100) : 0;
+    const clickPct = email.uniqueClicks && email.sent > 0 ? (email.uniqueClicks / email.sent * 100) : 0;
+    const openPct = email.uniqueOpens && email.sent > 0 ? (email.uniqueOpens / email.sent * 100) : 0;
+    if (rand < replyPct) {
+      status = 'replied';
+    } else if (rand < clickPct) {
       status = 'clicked';
-    } else if (rand < (email.uniqueOpens / email.sent * 100)) {
+    } else if (rand < openPct) {
       status = 'opened';
     } else {
       status = 'not-opened';
