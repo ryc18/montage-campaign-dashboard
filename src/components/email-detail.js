@@ -19,11 +19,11 @@ export function showEmailDetail(email) {
     const bounceRate = email.sent > 0 ? ((email.bounced / email.sent) * 100).toFixed(1) : 0;
 
     const funnelSteps = [
-      { label: 'Sent', value: email.sent, color: 'var(--accent-blue)', pct: 100 },
-      { label: 'Delivered', value: email.delivered, color: 'var(--accent-cyan)', pct: email.sent > 0 ? ((email.delivered / email.sent) * 100).toFixed(1) : 0 },
-      { label: 'Opened', value: email.uniqueOpens, color: 'var(--accent-indigo)', pct: email.sent > 0 ? ((email.uniqueOpens / email.sent) * 100).toFixed(1) : 0 },
-      { label: 'Clicked', value: email.uniqueClicks, color: 'var(--accent-emerald)', pct: email.sent > 0 ? ((email.uniqueClicks / email.sent) * 100).toFixed(1) : 0 },
-      { label: 'Replied', value: email.replied, color: 'var(--accent-violet)', pct: email.sent > 0 ? ((email.replied / email.sent) * 100).toFixed(1) : 0 },
+      { label: 'Sent', value: email.sent, color: 'var(--accent-blue)', pct: 100, filter: null },
+      { label: 'Delivered', value: email.delivered, color: 'var(--accent-cyan)', pct: email.sent > 0 ? ((email.delivered / email.sent) * 100).toFixed(1) : 0, filter: null },
+      { label: 'Opened', value: email.uniqueOpens, color: 'var(--accent-indigo)', pct: email.sent > 0 ? ((email.uniqueOpens / email.sent) * 100).toFixed(1) : 0, filter: 'opened' },
+      { label: 'Clicked', value: email.uniqueClicks, color: 'var(--accent-emerald)', pct: email.sent > 0 ? ((email.uniqueClicks / email.sent) * 100).toFixed(1) : 0, filter: 'clicked' },
+      { label: 'Replied', value: email.replied, color: 'var(--accent-violet)', pct: email.sent > 0 ? ((email.replied / email.sent) * 100).toFixed(1) : 0, filter: 'replied' },
     ];
 
     const recipients = generateRecipients(email);
@@ -72,7 +72,7 @@ export function showEmailDetail(email) {
           </h3>
           <div class="funnel-container">
             ${funnelSteps.map(step => `
-              <div class="funnel-step">
+              <div class="funnel-step ${step.filter ? 'funnel-clickable' : ''}" ${step.filter ? `data-funnel-filter="${step.filter}"` : ''}>
                 <div class="funnel-bar-wrapper">
                   <div class="funnel-bar" style="width: ${Math.max(step.pct, 2)}%; background: ${step.color};" data-width="${step.pct}"></div>
                 </div>
@@ -80,6 +80,7 @@ export function showEmailDetail(email) {
                   <span class="funnel-label">${step.label}</span>
                   <span class="funnel-value" style="color: ${step.color}">${step.value.toLocaleString()}</span>
                   <span class="funnel-pct">${step.pct}%</span>
+                  ${step.filter ? '<span class="funnel-drill" title="Click to see recipients">→</span>' : ''}
                 </div>
               </div>
             `).join('')}
@@ -279,16 +280,34 @@ export function showEmailDetail(email) {
     // Recipient filter buttons
     overlay.querySelectorAll('.filter-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        overlay.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const filter = btn.dataset.filter;
-        overlay.querySelectorAll('.recipient-row').forEach(row => {
-          row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
-        });
-        const visible = overlay.querySelectorAll('.recipient-row:not([style*="display: none"])').length;
-        overlay.querySelector('.recipients-count').textContent = `${visible} emails`;
+        applyRecipientFilter(overlay, btn.dataset.filter);
       });
     });
+
+    // Funnel bar click → switch to Recipients tab + apply filter
+    overlay.querySelectorAll('.funnel-clickable').forEach(step => {
+      step.addEventListener('click', () => {
+        const filter = step.dataset.funnelFilter;
+        // Switch to Recipients tab
+        overlay.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+        overlay.querySelector('.modal-tab[data-tab="recipients"]').classList.add('active');
+        overlay.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+        document.getElementById('tab-recipients').style.display = 'block';
+        // Apply filter
+        applyRecipientFilter(overlay, filter);
+      });
+    });
+
+    function applyRecipientFilter(container, filter) {
+      container.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      const targetBtn = container.querySelector(`.filter-btn[data-filter="${filter}"]`);
+      if (targetBtn) targetBtn.classList.add('active');
+      container.querySelectorAll('.recipient-row').forEach(row => {
+        row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
+      });
+      const visible = container.querySelectorAll('.recipient-row:not([style*="display: none"])').length;
+      container.querySelector('.recipients-count').textContent = `${visible} emails`;
+    }
 
     // Close handlers
     overlay.querySelector('#modalCloseBtn').addEventListener('click', closeModal);

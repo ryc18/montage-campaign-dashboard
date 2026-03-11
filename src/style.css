@@ -1233,6 +1233,31 @@ body {
   min-width: 40px;
 }
 
+.funnel-clickable {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+  margin: -2px -4px;
+  transition: background 0.2s ease;
+}
+
+.funnel-clickable:hover {
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.funnel-drill {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  margin-left: 2px;
+}
+
+.funnel-clickable:hover .funnel-drill {
+  opacity: 1;
+  transform: translateX(2px);
+}
+
 /* ── Detail Metrics Grid ───────────────────────────────── */
 .detail-metrics-grid {
   display: grid;
