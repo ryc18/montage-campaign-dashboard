@@ -341,24 +341,29 @@ function generateRecipients(email) {
   const count = Math.min(email.sent, 40);
   const baseDate = new Date(email.sendDate);
 
+  // Pre-calculate how many recipients get each status (proportional, with minimums)
+  const total = email.sent || 1;
+  const repliedCount = email.replied > 0 ? Math.max(1, Math.round(email.replied / total * count)) : 0;
+  const clickedCount = email.uniqueClicks > 0 ? Math.max(1, Math.round(email.uniqueClicks / total * count)) : 0;
+  const openedCount = email.uniqueOpens > 0 ? Math.max(1, Math.round(email.uniqueOpens / total * count)) : 0;
+
+  // Build status array: replied first, then clicked, then opened, then not-opened
+  const statuses = [];
+  for (let j = 0; j < repliedCount && statuses.length < count; j++) statuses.push('replied');
+  for (let j = 0; j < clickedCount && statuses.length < count; j++) statuses.push('clicked');
+  for (let j = 0; j < openedCount && statuses.length < count; j++) statuses.push('opened');
+  while (statuses.length < count) statuses.push('not-opened');
+  // Shuffle so they're not grouped together
+  for (let j = statuses.length - 1; j > 0; j--) {
+    const k = Math.floor(Math.random() * (j + 1));
+    [statuses[j], statuses[k]] = [statuses[k], statuses[j]];
+  }
+
   for (let i = 0; i < count; i++) {
     const name = names[i % names.length];
     const initials = name.split(' ').map(n => n[0]).join('');
 
-    let status;
-    const rand = Math.random() * 100;
-    const replyPct = email.replied && email.sent > 0 ? (email.replied / email.sent * 100) : 0;
-    const clickPct = email.uniqueClicks && email.sent > 0 ? (email.uniqueClicks / email.sent * 100) : 0;
-    const openPct = email.uniqueOpens && email.sent > 0 ? (email.uniqueOpens / email.sent * 100) : 0;
-    if (rand < replyPct) {
-      status = 'replied';
-    } else if (rand < clickPct) {
-      status = 'clicked';
-    } else if (rand < openPct) {
-      status = 'opened';
-    } else {
-      status = 'not-opened';
-    }
+    const status = statuses[i];
 
     const sendTime = new Date(baseDate);
     sendTime.setHours(sendTime.getHours() + Math.floor(Math.random() * 5), Math.floor(Math.random() * 60));
