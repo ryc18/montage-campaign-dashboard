@@ -536,8 +536,8 @@
             .map(([subject, stats]) => ({
                 subject,
                 ...stats,
-                openRate: stats.sent > 0 && (stats.opened + stats.notOpened) > 0
-                    ? ((stats.opened / (stats.opened + stats.notOpened)) * 100).toFixed(2)
+                openRate: stats.sent > 0
+                    ? ((stats.opened / stats.sent) * 100).toFixed(2)
                     : 0,
             }))
             .sort((a, b) => b.sent - a.sent);
@@ -607,8 +607,8 @@
             </tr>`;
         });
 
-        const overallRate = (totalOpened + totalNotOpened) > 0
-            ? ((totalOpened / (totalOpened + totalNotOpened)) * 100).toFixed(2) : '0';
+        const overallRate = totalSent > 0
+            ? ((totalOpened / totalSent) * 100).toFixed(2) : '0';
 
         html += `</tbody><tfoot><tr class="totals">
             <td>TOTALS</td><td>${totalSent}</td><td>${totalOpened}</td><td>${totalNotOpened}</td><td>—</td>
@@ -662,10 +662,10 @@
         }
 
         // Convert CSV subjects to email entries
+        // Only populate fields we actually have data for from the CSV
+        // Fields not available in the CSV are set to sensible defaults (not estimates)
         parsedCsvData.subjects.forEach((s, idx) => {
-            const tracked = s.opened + s.notOpened;
-            const openRate = tracked > 0 ? ((s.opened / tracked) * 100) : 0;
-            const clickRate = openRate > 0 ? (openRate * 0.06) : 0; // estimate
+            const openRate = s.sent > 0 ? ((s.opened / s.sent) * 100) : 0;
             const sendDate = s.firstDate ? s.firstDate.split(' ')[0] : new Date().toISOString().split('T')[0];
 
             campaign.emails.push({
@@ -673,19 +673,19 @@
                 subject: s.subject,
                 sender: senderName,
                 sent: s.sent,
-                delivered: Math.round(s.sent * 0.96),
-                bounced: Math.round(s.sent * 0.04),
+                delivered: s.sent,          // default to sent count (adjust manually if bounce data available)
+                bounced: 0,                 // not available in CSV — enter manually
                 unsubscribed: 0,
                 spam: 0,
-                notSent: Math.round(s.sent * 0.02),
-                uniqueOpens: s.opened,
-                totalOpens: Math.round(s.opened * 1.24),
-                uniqueClicks: Math.round(s.opened * 0.06),
-                totalClicks: Math.round(s.opened * 0.1),
-                replied: 0,
+                notSent: 0,                 // not available in CSV — enter manually
+                uniqueOpens: s.opened,      // from CSV tracking data
+                totalOpens: s.opened,       // minimum known value — adjust if Pipedrive provides total
+                uniqueClicks: 0,            // not available in CSV — enter manually
+                totalClicks: 0,             // not available in CSV — enter manually
+                replied: 0,                 // not available in CSV — enter manually
                 openRate: +openRate.toFixed(2),
-                clickRate: +clickRate.toFixed(2),
-                clickThroughRate: +(clickRate * 1.8).toFixed(2),
+                clickRate: 0,               // will be calculated from actual click data
+                clickThroughRate: 0,         // will be calculated from actual click data
                 replyRate: 0,
                 sendDate,
                 links: [],
@@ -694,7 +694,7 @@
             });
         });
 
-        showToast(`✅ ${parsedCsvData.subjects.length} emails applied to ${campaign.name}`, 'success');
+        showToast(`✅ ${parsedCsvData.subjects.length} emails imported. Review delivery & click stats in the form below — some fields need manual entry.`, 'success');
         clearCsvPreview();
         render();
     }

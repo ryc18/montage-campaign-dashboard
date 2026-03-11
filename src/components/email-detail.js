@@ -26,7 +26,7 @@ export function showEmailDetail(email) {
       { label: 'Replied', value: email.replied, color: 'var(--accent-violet)', pct: email.sent > 0 ? ((email.replied / email.sent) * 100).toFixed(1) : 0, filter: 'replied' },
     ];
 
-    const recipients = generateRecipients(email);
+    const recipients = generateRecipientStatusView(email);
 
     overlay.innerHTML = `
     <div class="modal-content modal-wide">
@@ -188,9 +188,13 @@ export function showEmailDetail(email) {
 
       <!-- Recipients Tab -->
       <div class="modal-body tab-content" id="tab-recipients" style="display:none;">
+        <div style="padding: 8px 16px; background: rgba(99,102,241,0.08); border-radius: 8px; margin-bottom: 12px; font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          Status distribution based on aggregate tracking data. Showing ${Math.min(email.sent, 40)} of ${email.sent.toLocaleString()} total recipients.
+        </div>
         <div class="recipients-header">
           <div class="recipients-summary">
-            <span class="recipients-count">${recipients.length} emails</span>
+            <span class="recipients-count">${recipients.length} recipients</span>
             <div class="recipients-filter-group">
               <button class="filter-btn active" data-filter="all">All</button>
               <button class="filter-btn" data-filter="opened">
@@ -306,7 +310,7 @@ export function showEmailDetail(email) {
         row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
       });
       const visible = container.querySelectorAll('.recipient-row:not([style*="display: none"])').length;
-      container.querySelector('.recipients-count').textContent = `${visible} emails`;
+      container.querySelector('.recipients-count').textContent = `${visible} recipients`;
     }
 
     // Close handlers
@@ -318,19 +322,10 @@ export function showEmailDetail(email) {
   }
 }
 
-// ── Generate Demo Recipients ──────────────────────────────
-function generateRecipients(email) {
-  const names = [
-    'Duncan Turner', 'Sarah Mitchell', 'James Peterson', 'Emma Williams',
-    'Michael Chen', 'Olivia Brown', 'David Wilson', 'Sophie Taylor',
-    'Chris Anderson', 'Kate Johnson', 'Ryan Thomas', 'Lisa Martin',
-    'Andrew Jackson', 'Megan White', 'Daniel Harris', 'Rachel Lee',
-    'Ben Thompson', 'Amy Robinson', 'Sam Clark', 'Natalie Walker',
-    'Tom Lewis', 'Hannah Young', 'Jack King', 'Emily Scott',
-    'Luke Adams', 'Grace Baker', 'Harry Nelson', 'Chloe Hill',
-    'Josh Campbell', 'Zoe Mitchell', 'Max Allen', 'Ruby Wright',
-  ];
-
+// ── Generate Recipient Status View ───────────────────────────
+// Shows proportional status distribution based on aggregate data
+// Individual recipient identities are not available from Pipedrive CSV
+function generateRecipientStatusView(email) {
   const colors = [
     'var(--accent-indigo)', 'var(--accent-violet)', 'var(--accent-blue)',
     'var(--accent-cyan)', 'var(--accent-emerald)', 'var(--accent-amber)',
@@ -341,11 +336,18 @@ function generateRecipients(email) {
   const count = Math.min(email.sent, 40);
   const baseDate = new Date(email.sendDate);
 
-  // Pre-calculate how many recipients get each status (proportional, with minimums)
-  const total = email.sent || 1;
-  const repliedCount = email.replied > 0 ? Math.max(1, Math.round(email.replied / total * count)) : 0;
-  const clickedCount = email.uniqueClicks > 0 ? Math.max(1, Math.round(email.uniqueClicks / total * count)) : 0;
-  const openedCount = email.uniqueOpens > 0 ? Math.max(1, Math.round(email.uniqueOpens / total * count)) : 0;
+  // Non-overlapping status counts (each recipient gets ONE status — their highest engagement)
+  // replied ⊂ opened, clicked ⊂ opened — so subtract to avoid double-counting
+  const repliedRaw = email.replied;
+  const clickedRaw = Math.max(0, email.uniqueClicks - email.replied);
+  const openedRaw = Math.max(0, email.uniqueOpens - email.uniqueClicks);
+  const notOpenedRaw = Math.max(0, email.sent - email.uniqueOpens);
+  const rawTotal = repliedRaw + clickedRaw + openedRaw + notOpenedRaw || 1;
+
+  // Proportional allocation for the displayed sample
+  const repliedCount = repliedRaw > 0 ? Math.max(1, Math.round(repliedRaw / rawTotal * count)) : 0;
+  const clickedCount = clickedRaw > 0 ? Math.max(1, Math.round(clickedRaw / rawTotal * count)) : 0;
+  const openedCount = openedRaw > 0 ? Math.max(1, Math.round(openedRaw / rawTotal * count)) : 0;
 
   // Build status array: replied first, then clicked, then opened, then not-opened
   const statuses = [];
@@ -360,8 +362,9 @@ function generateRecipients(email) {
   }
 
   for (let i = 0; i < count; i++) {
-    const name = names[i % names.length];
-    const initials = name.split(' ').map(n => n[0]).join('');
+    const recipientNum = i + 1;
+    const name = `Recipient #${recipientNum}`;
+    const initials = `R${recipientNum}`;
 
     const status = statuses[i];
 
