@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// Email Detail Modal Component
+// Email Detail Modal Component  v2.1 – clickable funnel bars
 // Shows detailed view when clicking on an email row
 // Includes recipient-level tracking like Pipedrive's drill-down
 // ═══════════════════════════════════════════════════════════
