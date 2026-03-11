@@ -1,7 +1,8 @@
-const { put, list, del } = require('@vercel/blob');
 const express = require('express');
-const app = express();
+let blob;
+try { blob = require('@vercel/blob'); } catch (e) { blob = null; }
 
+const app = express();
 app.use(express.json({ limit: '5mb' }));
 
 const ADMIN_PIN = process.env.ADMIN_PIN || 'rrm2026';
@@ -16,23 +17,27 @@ function checkPin(req, res, next) {
     next();
 }
 
-// GET /api/admin/data — load campaign data from Vercel Blob
+// GET /admin/data — load campaign data
 app.get('/admin/data', checkPin, async (req, res) => {
     try {
-        const { blobs } = await list({ prefix: BLOB_KEY });
-        if (blobs.length === 0) {
-            return res.json({ success: true, data: null, source: 'none' });
+        // Try Vercel Blob first
+        if (blob && process.env.BLOB_READ_WRITE_TOKEN) {
+            const { blobs } = await blob.list({ prefix: BLOB_KEY });
+            if (blobs.length > 0) {
+                const response = await fetch(blobs[0].url);
+                const data = await response.json();
+                return res.json({ success: true, data, source: 'blob' });
+            }
         }
-        const response = await fetch(blobs[0].url);
-        const data = await response.json();
-        res.json({ success: true, data, source: 'blob' });
+        // No blob data — return null so frontend loads from campaigns API
+        res.json({ success: true, data: null, source: 'none' });
     } catch (err) {
-        console.error('Failed to load from blob:', err);
-        res.json({ success: true, data: null, source: 'error', error: err.message });
+        console.error('Failed to load from blob:', err.message);
+        res.json({ success: true, data: null, source: 'fallback', error: err.message });
     }
 });
 
-// POST /api/admin/data — save campaign data to Vercel Blob
+// POST /admin/data — save campaign data
 app.post('/admin/data', checkPin, async (req, res) => {
     try {
         const data = req.body;
@@ -40,21 +45,23 @@ app.post('/admin/data', checkPin, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Invalid data format. Need { clients, campaigns }' });
         }
 
-        // Delete old blob if exists
-        const { blobs } = await list({ prefix: BLOB_KEY });
-        for (const blob of blobs) {
-            await del(blob.url);
+        // Try Vercel Blob
+        if (blob && process.env.BLOB_READ_WRITE_TOKEN) {
+            const { blobs } = await blob.list({ prefix: BLOB_KEY });
+            for (const b of blobs) {
+                await blob.del(b.url);
+            }
+            const result = await blob.put(BLOB_KEY, JSON.stringify(data), {
+                access: 'public',
+                contentType: 'application/json',
+            });
+            return res.json({ success: true, message: 'Data saved to blob', url: result.url });
         }
 
-        // Store new data
-        const blob = await put(BLOB_KEY, JSON.stringify(data), {
-            access: 'public',
-            contentType: 'application/json',
-        });
-
-        res.json({ success: true, message: 'Data saved', url: blob.url });
+        // No blob available — data won't persist but CSV import still works in-session
+        res.json({ success: true, message: 'Data accepted (no persistent storage configured — add BLOB_READ_WRITE_TOKEN to enable)', warning: 'no-blob' });
     } catch (err) {
-        console.error('Failed to save to blob:', err);
+        console.error('Failed to save:', err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 });
